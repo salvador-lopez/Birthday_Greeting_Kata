@@ -3,47 +3,55 @@
 class BirthdayService
 {
     /**
-     * @var Swift_Mailer
+     * @var EmployeeRepository
+     */
+    private $employeeRepository;
+
+    /**
+     * @var MailerService
      */
     private $mailer;
 
-    public function sendGreetings($fileName, XDate $xDate, $smtpHost, $smtpPort)
+    /**
+     * @param EmployeeRepository $employeeRepository
+     * @param $mailer
+     */
+    public function __construct($employeeRepository, $mailer)
     {
-        $fileHandler = fopen($fileName, 'r');
-        fgetcsv($fileHandler);
+        $this->employeeRepository = $employeeRepository;
+        $this->mailer = $mailer;
+    }
 
-        while ($employeeData = fgetcsv($fileHandler, null, ',')) {
-            $employeeData = array_map('trim', $employeeData);
-            $employee = new Employee($employeeData[1], $employeeData[0], $employeeData[2], $employeeData[3]);
-            if ($employee->isBirthday($xDate)) {
-                $recipient = $employee->getEmail();
-                $body = sprintf('Happy Birthday, dear %s!', $employee->getFirstName());
-                $subject = 'Happy Birthday!';
-                $this->sendMessage($smtpHost, $smtpPort, 'sender@here.com', $subject, $body, $recipient);
-            }
+    public function sendGreetings(XDate $xDate)
+    {
+        $employees = $this->findEmployeesWhoseBirthdayIs($xDate);
+
+        foreach ($employees as $employee) {
+            $this->sendGreetingsMessage($employee);
         }
     }
 
-    private function sendMessage($smtpHost, $smtpPort, $sender, $subject, $body, $recipient)
+    /**
+     * @param XDate  $xDate
+     *
+     * @return array $employees
+     */
+    private function findEmployeesWhoseBirthdayIs(XDate $xDate)
     {
-        // Create a mail session
-        $this->mailer = Swift_Mailer::newInstance(Swift_SmtpTransport::newInstance($smtpHost, $smtpPort));
+        $employees = $this->employeeRepository->findEmployeesWhoseBirthdayIs($xDate);
 
-        // Construct the message
-        $msg = Swift_Message::newInstance($subject);
-        $msg
-            ->setFrom($sender)
-            ->setTo([$recipient])
-            ->setBody($body)
-        ;
-
-        // Send the message
-        $this->doSendMessage($msg);
+        return $employees;
     }
 
-    // made protected for testing :-(
-    protected function doSendMessage(Swift_Message $msg)
+    /**
+     * @param Employee $employee
+     */
+    private function sendGreetingsMessage($employee)
     {
-        $this->mailer->send($msg);
+        $recipient = $employee->getEmail();
+        $body      = sprintf('Happy Birthday, dear %s!', $employee->getFirstName());
+        $subject   = 'Happy Birthday!';
+
+        $this->mailer->sendMessage('sender@here.com', $subject, $body, $recipient);
     }
 }

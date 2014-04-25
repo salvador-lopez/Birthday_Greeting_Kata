@@ -3,11 +3,6 @@
 class AcceptanceTest extends PHPUnit_Framework_TestCase
 {
     /**
-     * @var int
-     */
-    private static $SMTP_PORT = 25;
-
-    /**
      * @var Swift_Message[]
      */
     private $messagesSent = [];
@@ -17,14 +12,24 @@ class AcceptanceTest extends PHPUnit_Framework_TestCase
      */
     private $service;
 
+    /**
+     * @var MailerService
+     */
+    private $mailerService;
+
     public function setUp()
     {
         $messageHandler = function (Swift_Message $msg) {
             $this->messagesSent[] = $msg;
         };
 
-        $this->service = new TestableBirthdayService();
-        $this->service->setMessageHandler($messageHandler->bindTo($this));
+        $this->mailerService = new TestableMailerService(null);
+        $this->mailerService->setMessageHandler($messageHandler->bindTo($this));
+
+        $this->service = new BirthdayService(
+            new FileEmployeeRepository(__DIR__ . '/resources/employee_data.txt'),
+            $this->mailerService
+        );
     }
 
     public function tearDown()
@@ -37,7 +42,7 @@ class AcceptanceTest extends PHPUnit_Framework_TestCase
      */
     public function willSendGreetings_whenItsSomebodysBirthday()
     {
-        $this->service->sendGreetings(__DIR__ . '/resources/employee_data.txt', new XDate('2008/10/08'), 'localhost', static::$SMTP_PORT);
+        $this->service->sendGreetings(new XDate('2008/10/08'));
 
         $this->assertCount(1, $this->messagesSent, 'message not sent?');
         $message = $this->messagesSent[0];
@@ -52,13 +57,13 @@ class AcceptanceTest extends PHPUnit_Framework_TestCase
      */
     public function willNotSendEmailsWhenNobodysBirthday()
     {
-        $this->service->sendGreetings(__DIR__ . '/resources/employee_data.txt', new XDate('2008/01/01'), 'localhost', static::$SMTP_PORT);
+        $this->service->sendGreetings(new XDate('2008/01/01'));
 
         $this->assertCount(0, $this->messagesSent, 'what? messages?');
     }
 }
 
-class TestableBirthdayService extends BirthdayService
+class TestableMailerService extends SwiftMailerService
 {
     /**
      * @var Closure
